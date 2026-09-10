@@ -1,7 +1,7 @@
 # iOS Fluid Animations (LSPosed Module)
 ### Высокопроизводительные анимации в стиле iOS для Poco X6 Pro 5G (LineageOS 23.2 / Android 16)
 
-[![GitHub Release](https://img.shields.io/badge/Release-v1.0.0-blue.svg)](https://github.com/yariktop133/ios-fluid-animations-lsposed/releases)
+[![GitHub Release](https://img.shields.io/badge/Release-v1.2.1-blue.svg)](https://github.com/yariktop133/ios-fluid-animations-lsposed/releases)
 [![Platform](https://img.shields.io/badge/Platform-Android%2016%20(API%2036)-green.svg)](https://android.com)
 [![Target](https://img.shields.io/badge/Device-Poco%20X6%20Pro%205G%20(120Hz)-orange.svg)]()
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed%20Vector%202.2%2B-purple.svg)]()

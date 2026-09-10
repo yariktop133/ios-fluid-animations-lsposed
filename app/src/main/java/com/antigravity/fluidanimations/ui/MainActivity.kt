@@ -106,8 +106,7 @@ class MainActivity : ComponentActivity() {
                 val process = Runtime.getRuntime().exec("su")
                 java.io.DataOutputStream(process.outputStream).use { os ->
                     os.writeBytes("am force-stop $pkg\n")
-                    os.writeBytes("killall -9 $pkg 2>/dev/null || true\n")
-                    os.writeBytes("exit\n")
+                    os.writeBytes("exit 0\n")
                     os.flush()
                 }
                 val exitCode = process.waitFor()
