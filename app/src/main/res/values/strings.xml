@@ -9,7 +9,8 @@
     <string name="preset_custom">Пользовательский</string>
     <string name="stiffness_title">Жесткость пружины (Stiffness)</string>
     <string name="damping_title">Затухание (Damping Ratio)</string>
-    <string name="duration_title">Базовая длительность перехода (мс)</string>
+    <string name="open_duration_title">Время открытия приложения (мс)</string>
+    <string name="close_duration_title">Время закрытия / возврата домой (мс)</string>
     <string name="corner_radius_title">Морфинг скругления углов</string>
     <string name="landing_bounce_title">Отскок иконки при приземлении</string>
     <string name="wallpaper_zoom_title">Глубина обоев (Wallpaper Depth Zoom)</string>

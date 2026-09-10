@@ -44,7 +44,7 @@ object SystemUiNotificationHook {
                 XposedBridge.hookAllConstructors(timingsClass, object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         try {
-                            XposedHelpers.setLongField(param.thisObject, "totalDuration", ConfigManager.config.durationMs)
+                            XposedHelpers.setLongField(param.thisObject, "totalDuration", ConfigManager.config.openDurationMs)
                         } catch (t: Throwable) {
                             // Ignore if field differs
                         }

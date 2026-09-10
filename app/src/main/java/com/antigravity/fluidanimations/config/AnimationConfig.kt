@@ -6,7 +6,8 @@ data class AnimationConfig(
     val presetName: String = PRESET_IOS_FLUID,
     val stiffness: Float = 340f,
     val dampingRatio: Float = 0.84f,
-    val durationMs: Long = 380L,
+    val openDurationMs: Long = 360L,
+    val closeDurationMs: Long = 410L,
     val appToAppDurationMs: Long = 320L,
     val cornerRadiusMorph: Boolean = true,
     val landingBounce: Boolean = true,
@@ -19,7 +20,8 @@ data class AnimationConfig(
         obj.put("presetName", presetName)
         obj.put("stiffness", stiffness.toDouble())
         obj.put("dampingRatio", dampingRatio.toDouble())
-        obj.put("durationMs", durationMs)
+        obj.put("openDurationMs", openDurationMs)
+        obj.put("closeDurationMs", closeDurationMs)
         obj.put("appToAppDurationMs", appToAppDurationMs)
         obj.put("cornerRadiusMorph", cornerRadiusMorph)
         obj.put("landingBounce", landingBounce)
@@ -42,7 +44,8 @@ data class AnimationConfig(
                 presetName = PRESET_IOS_FLUID,
                 stiffness = 340f,
                 dampingRatio = 0.84f,
-                durationMs = 380L,
+                openDurationMs = 360L,
+                closeDurationMs = 410L,
                 appToAppDurationMs = 320L,
                 cornerRadiusMorph = true,
                 landingBounce = true,
@@ -54,7 +57,8 @@ data class AnimationConfig(
                 presetName = PRESET_IOS_BOUNCY,
                 stiffness = 290f,
                 dampingRatio = 0.78f,
-                durationMs = 420L,
+                openDurationMs = 380L,
+                closeDurationMs = 450L,
                 appToAppDurationMs = 340L,
                 cornerRadiusMorph = true,
                 landingBounce = true,
@@ -66,7 +70,8 @@ data class AnimationConfig(
                 presetName = PRESET_SNAPPY_120HZ,
                 stiffness = 450f,
                 dampingRatio = 0.88f,
-                durationMs = 280L,
+                openDurationMs = 260L,
+                closeDurationMs = 290L,
                 appToAppDurationMs = 260L,
                 cornerRadiusMorph = true,
                 landingBounce = true,
@@ -80,11 +85,16 @@ data class AnimationConfig(
             if (jsonStr.isNullOrBlank()) return DEFAULT
             return try {
                 val obj = JSONObject(jsonStr)
+                val legacyDuration = obj.optLong("durationMs", 0L)
+                val openDur = if (obj.has("openDurationMs")) obj.optLong("openDurationMs", 360L) else (if (legacyDuration > 0) legacyDuration else 360L)
+                val closeDur = if (obj.has("closeDurationMs")) obj.optLong("closeDurationMs", 410L) else (if (legacyDuration > 0) (legacyDuration + 40) else 410L)
+
                 AnimationConfig(
                     presetName = obj.optString("presetName", PRESET_IOS_FLUID),
                     stiffness = obj.optDouble("stiffness", 340.0).toFloat(),
                     dampingRatio = obj.optDouble("dampingRatio", 0.84).toFloat(),
-                    durationMs = obj.optLong("durationMs", 380L),
+                    openDurationMs = openDur,
+                    closeDurationMs = closeDur,
                     appToAppDurationMs = obj.optLong("appToAppDurationMs", 320L),
                     cornerRadiusMorph = obj.optBoolean("cornerRadiusMorph", true),
                     landingBounce = obj.optBoolean("landingBounce", true),

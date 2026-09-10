@@ -298,20 +298,22 @@ fun SpringTestCard(config: AnimationConfig) {
                     .background(AppleBlue)
                     .clickable {
                         coroutineScope.launch {
+                            val opening = !isExpanded
                             val target = if (isExpanded) 0f else 1f
                             isExpanded = !isExpanded
 
-                            // Кастомный расчет пружины для анимации в Compose
+                            // Кастомный расчет пружины для анимации в Compose с учетом направления
+                            val duration = if (opening) config.openDurationMs else config.closeDurationMs
                             val interpolator = SpringInterpolator(
                                 stiffness = config.stiffness,
                                 dampingRatio = config.dampingRatio,
-                                durationMs = config.durationMs
+                                durationMs = duration
                             )
 
                             animatedProgress.animateTo(
                                 targetValue = target,
                                 animationSpec = tween(
-                                    durationMillis = config.durationMs.toInt(),
+                                    durationMillis = duration.toInt(),
                                     easing = { fraction -> interpolator.getInterpolation(fraction) }
                                 )
                             )
@@ -329,7 +331,7 @@ fun SpringTestCard(config: AnimationConfig) {
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = if (isExpanded) "Состояние: Открыто (Window)" else "Состояние: Иконка (Launcher)",
+                text = if (isExpanded) "Состояние: Открыто (Window • ${config.openDurationMs}мс)" else "Состояние: Иконка (Launcher • ${config.closeDurationMs}мс)",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -407,14 +409,25 @@ fun PhysicsSlidersSection(
                 }
             )
 
-            // Длительность Launcher <-> App
+            // Длительность открытия (Launch from icon)
             SliderItem(
-                title = "Длительность открытия/закрытия (мс)",
-                value = config.durationMs.toFloat(),
-                valueText = "${config.durationMs} мс",
-                range = 220f..550f,
+                title = "Время открытия приложения (мс)",
+                value = config.openDurationMs.toFloat(),
+                valueText = "${config.openDurationMs} мс",
+                range = 180f..550f,
                 onValueChange = {
-                    onConfigUpdated(config.copy(presetName = AnimationConfig.PRESET_CUSTOM, durationMs = it.toLong()))
+                    onConfigUpdated(config.copy(presetName = AnimationConfig.PRESET_CUSTOM, openDurationMs = it.toLong()))
+                }
+            )
+
+            // Длительность закрытия (Swipe to Home)
+            SliderItem(
+                title = "Время закрытия / возврата домой (мс)",
+                value = config.closeDurationMs.toFloat(),
+                valueText = "${config.closeDurationMs} мс",
+                range = 180f..600f,
+                onValueChange = {
+                    onConfigUpdated(config.copy(presetName = AnimationConfig.PRESET_CUSTOM, closeDurationMs = it.toLong()))
                 }
             )
 

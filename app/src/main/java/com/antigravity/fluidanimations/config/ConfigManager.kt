@@ -21,12 +21,24 @@ object ConfigManager {
         private set
 
     @Volatile
-    var springInterpolator: SpringInterpolator = SpringInterpolator(
-        config.stiffness,
-        config.dampingRatio,
-        config.durationMs
+    var openSpringInterpolator: SpringInterpolator = SpringInterpolator(
+        stiffness = config.stiffness,
+        dampingRatio = config.dampingRatio,
+        durationMs = config.openDurationMs
     )
         private set
+
+    @Volatile
+    var closeSpringInterpolator: SpringInterpolator = SpringInterpolator(
+        stiffness = config.stiffness,
+        dampingRatio = config.dampingRatio,
+        durationMs = config.closeDurationMs
+    )
+        private set
+
+    // Обратная совместимость для общего интерполятора
+    val springInterpolator: SpringInterpolator
+        get() = openSpringInterpolator
 
     @Volatile
     private var isObserverRegistered = false
@@ -50,7 +62,7 @@ object ConfigManager {
             val json = bundle?.getString(ConfigProvider.KEY_CONFIG_JSON)
             if (!json.isNullOrBlank()) {
                 updateConfigInMemory(AnimationConfig.fromJson(json))
-                Log.d(TAG, "Config loaded successfully: ${config.presetName}")
+                Log.d(TAG, "Config loaded successfully: ${config.presetName}, open=${config.openDurationMs}ms, close=${config.closeDurationMs}ms")
             }
         } catch (e: Throwable) {
             Log.w(TAG, "Failed to load config from provider, using defaults: ${e.message}")
@@ -76,10 +88,15 @@ object ConfigManager {
 
     private fun updateConfigInMemory(newConfig: AnimationConfig) {
         config = newConfig
-        springInterpolator = SpringInterpolator(
+        openSpringInterpolator = SpringInterpolator(
             stiffness = newConfig.stiffness,
             dampingRatio = newConfig.dampingRatio,
-            durationMs = newConfig.durationMs
+            durationMs = newConfig.openDurationMs
+        )
+        closeSpringInterpolator = SpringInterpolator(
+            stiffness = newConfig.stiffness,
+            dampingRatio = newConfig.dampingRatio,
+            durationMs = newConfig.closeDurationMs
         )
     }
 

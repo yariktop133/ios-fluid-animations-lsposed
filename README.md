@@ -67,7 +67,8 @@
 |---|---|---|---|
 | **Stiffness** | 340 | 290 | 450 |
 | **Damping Ratio** | 0.84 | 0.78 | 0.88 |
-| **Launcher $\leftrightarrow$ App** | 380 ms | 420 ms | 280 ms |
+| **Время открытия (Open)** | 360 ms | 380 ms | 260 ms |
+| **Время закрытия (Close)** | 410 ms | 450 ms | 290 ms |
 | **App $\leftrightarrow$ App** | 320 ms | 340 ms | 260 ms |
 | **Landing Bounce** | Включен | Включен | Выключен |
 

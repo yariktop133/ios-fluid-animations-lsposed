@@ -118,11 +118,11 @@ object TrebuchetLauncherHook {
 
         try {
             // Подменяем статические поля интерполяторов
-            setFinalStatic(interpolatorsClass, "EMPHASIZED", ConfigManager.springInterpolator)
-            setFinalStatic(interpolatorsClass, "EMPHASIZED_DECELERATE", ConfigManager.springInterpolator)
-            setFinalStatic(interpolatorsClass, "APP_CLOSE_SPRING", ConfigManager.springInterpolator)
+            setFinalStatic(interpolatorsClass, "EMPHASIZED", ConfigManager.openSpringInterpolator)
+            setFinalStatic(interpolatorsClass, "EMPHASIZED_DECELERATE", ConfigManager.openSpringInterpolator)
+            setFinalStatic(interpolatorsClass, "APP_CLOSE_SPRING", ConfigManager.closeSpringInterpolator)
             setFinalStatic(interpolatorsClass, "AGGRESSIVE_EASE", FluidCurves.IOS_RAPID_DECEL)
-            Log.i(TAG, "Launcher3 Interpolators replaced with iOS spring curves")
+            Log.i(TAG, "Launcher3 Interpolators replaced with iOS spring curves (open & close)")
         } catch (t: Throwable) {
             Log.w(TAG, "Unable to replace static Interpolators: ${t.message}")
         }
@@ -180,8 +180,8 @@ object TrebuchetLauncherHook {
      * Рекурсивное применение пружинного интерполятора и обновленной длительности к аниматорам.
      */
     private fun applySpringToAnimator(obj: Any, isOpening: Boolean) {
-        val spring = ConfigManager.springInterpolator
-        val duration = ConfigManager.config.durationMs
+        val spring = if (isOpening) ConfigManager.openSpringInterpolator else ConfigManager.closeSpringInterpolator
+        val duration = if (isOpening) ConfigManager.config.openDurationMs else ConfigManager.config.closeDurationMs
 
         when (obj) {
             is ValueAnimator -> {
@@ -212,6 +212,7 @@ object TrebuchetLauncherHook {
      * Эффект отскока иконки (Landing Bounce) в стиле iOS при возврате в лаунчер.
      */
     private fun scheduleLandingBounce(view: View) {
+        val delay = (ConfigManager.config.closeDurationMs - 120).coerceAtLeast(100L)
         view.postDelayed({
             view.animate()
                 .scaleX(0.88f)
@@ -226,7 +227,7 @@ object TrebuchetLauncherHook {
                         .start()
                 }
                 .start()
-        }, ConfigManager.config.durationMs - 120)
+        }, delay)
     }
 
     private fun findClassSafe(className: String, classLoader: ClassLoader): Class<*>? {
