@@ -101,17 +101,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun restartPackage(pkg: String) {
-        try {
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "pkill -f $pkg || am force-stop $pkg"))
-            val exitCode = process.waitFor()
-            if (exitCode == 0) {
-                Toast.makeText(this, "Перезапущено: $pkg", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Требуется Root доступ для авто-перезапуска", Toast.LENGTH_LONG).show()
+        Thread {
+            try {
+                val process = Runtime.getRuntime().exec("su")
+                java.io.DataOutputStream(process.outputStream).use { os ->
+                    os.writeBytes("am force-stop $pkg\n")
+                    os.writeBytes("killall -9 $pkg 2>/dev/null || true\n")
+                    os.writeBytes("exit\n")
+                    os.flush()
+                }
+                val exitCode = process.waitFor()
+                runOnUiThread {
+                    Toast.makeText(this, "Перезапущено: $pkg", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "Ошибка Root: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Не удалось перезапустить: ${e.message}", Toast.LENGTH_LONG).show()
-        }
+        }.start()
     }
 }
 

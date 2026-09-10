@@ -6,7 +6,6 @@ import android.content.Context
 import android.util.Log
 import android.view.animation.Animation
 import android.view.animation.AnimationSet
-import android.view.animation.ScaleAnimation
 import com.antigravity.fluidanimations.config.ConfigManager
 import com.antigravity.fluidanimations.physics.FluidCurves
 import de.robv.android.xposed.XC_MethodHook
@@ -26,6 +25,7 @@ object WMShellTransitionHook {
 
         hookDefaultTransitionHandler(classLoader)
         hookShellTransitions(classLoader)
+        hookScreenDecorationsUtils(classLoader)
     }
 
     private fun hookDefaultTransitionHandler(classLoader: ClassLoader) {
@@ -84,20 +84,60 @@ object WMShellTransitionHook {
         }
     }
 
+    /**
+     * Точный радиус скругления дисплея Poco X6 Pro для переходов SystemUI.
+     */
+    private fun hookScreenDecorationsUtils(classLoader: ClassLoader) {
+        val sduClass = findClassSafe("com.android.internal.policy.ScreenDecorationsUtils", classLoader)
+            ?: findClassSafe("com.android.systemui.util.ScreenDecorationsUtils", classLoader)
+            ?: return
+
+        try {
+            XposedBridge.hookAllMethods(sduClass, "getWindowCornerRadius", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!ConfigManager.config.cornerRadiusMorph) return
+                    val context = param.args.firstOrNull() as? Context
+                    val density = context?.resources?.displayMetrics?.density ?: 2.75f
+                    param.result = ConfigManager.config.displayCornerRadiusDp * density
+                }
+            })
+            Log.i(TAG, "ScreenDecorationsUtils.getWindowCornerRadius hooked")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to hook ScreenDecorationsUtils: ${t.message}")
+        }
+    }
+
+    /**
+     * Применение параметров перехода к анимациям с пропорциональным масштабированием startOffset для child animations.
+     */
     private fun applyIosTransitionSpecs(obj: Any) {
         val duration = ConfigManager.config.appToAppDurationMs
         val curve = FluidCurves.IOS_APP_TO_APP
 
         when (obj) {
+            is AnimationSet -> {
+                val origParentDuration = obj.duration.takeIf { it > 0 } ?: duration
+                val scaleFactor = duration.toFloat() / origParentDuration.toFloat()
+                obj.duration = duration
+                obj.interpolator = curve
+
+                for (child in obj.animations) {
+                    val origStartOffset = child.startOffset
+                    child.startOffset = (origStartOffset * scaleFactor).toLong()
+
+                    val origChildDuration = child.duration
+                    val newChildDuration = if (origChildDuration > 0) {
+                        (origChildDuration * scaleFactor).toLong()
+                    } else {
+                        duration
+                    }
+                    child.duration = newChildDuration
+                    child.interpolator = curve
+                }
+            }
             is Animation -> {
                 obj.duration = duration
                 obj.interpolator = curve
-                if (obj is AnimationSet) {
-                    for (child in obj.animations) {
-                        child.duration = duration
-                        child.interpolator = curve
-                    }
-                }
             }
             is ValueAnimator -> {
                 obj.duration = duration

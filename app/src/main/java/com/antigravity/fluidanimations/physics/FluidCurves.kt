@@ -28,4 +28,17 @@ object FluidCurves {
      * Легкий overshoot (выход за пределы 1.0 с последующим возвратом).
      */
     val IOS_LANDING_BOUNCE: Interpolator = PathInterpolator(0.175f, 0.885f, 0.32f, 1.15f)
+
+    /**
+     * Выделенная кривая HyperOS 3 / iOS Fluid Quintic для вертикальной оси (Y), масштабирования и скругления при открытии.
+     * Quintic Bezier (0.20, 0.0, 0.0, 1.0)
+     */
+    val HYPEROS_OPEN: Interpolator = PathInterpolator(0.20f, 0.0f, 0.0f, 1.0f)
+
+    /**
+     * Выделенная кривая HyperOS 3 / iOS Fluid Quintic для горизонтальной оси (X) при открытии.
+     * Quintic Bezier (0.22, 0.0, 0.10, 1.0)
+     */
+    val HYPEROS_OPEN_X: Interpolator = PathInterpolator(0.22f, 0.0f, 0.10f, 1.0f)
 }
+

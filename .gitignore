@@ -10,3 +10,13 @@ captures/
 .externalNativeBuild
 .cxx
 local.properties
+
+# Decompiled references
+/AbsSwipeUpHandler.java
+/ActivityTransitionAnimator.kt
+/DefaultSurfaceAnimator.java
+/DefaultTransitionHandler.java
+/FloatingIconView.java
+/QuickstepTransitionManager_extracted.txt
+/QuickstepTransitionManager_raw.java
+/RectFSpringAnim.java
