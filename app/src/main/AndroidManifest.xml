@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FluidAnimations">
+
+        <!-- LSPosed / Xposed Module Metadata -->
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="Плавные физические анимации открытия и закрытия приложений в стиле iOS для LineageOS 23.2 (Poco X6 Pro 120Hz)" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="82" />
+        <meta-data
+            android:name="xposedscope"
+            android:resource="@array/xposed_scope" />
+
+        <!-- Settings Activity -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FluidAnimations">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- LSPosed settings intent -->
+            <intent-filter>
+                <action android:name="de.robv.android.xposed.action.SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Configuration ContentProvider accessible across processes for zero-delay settings sync -->
+        <provider
+            android:name=".config.ConfigProvider"
+            android:authorities="com.antigravity.fluidanimations.provider"
+            android:exported="true"
+            android:multiprocess="false" />
+
+    </application>
+
+</manifest>

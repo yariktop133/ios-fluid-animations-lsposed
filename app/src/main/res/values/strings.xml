@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">iOS Fluid Animations</string>
+    <string name="module_description">Высокопроизводительные анимации в стиле iOS для Poco X6 Pro 5G на LineageOS 23.2</string>
+    <string name="status_active">Модуль активен в LSPosed</string>
+    <string name="status_inactive">Модуль не активен (включите в приложении LSPosed)</string>
+    <string name="preset_ios_default">iOS Fluid (По умолчанию)</string>
+    <string name="preset_ios_bouncy">iOS Bouncy (Упругий)</string>
+    <string name="preset_snappy_120hz">Snappy 120Hz (Быстрый)</string>
+    <string name="preset_custom">Пользовательский</string>
+    <string name="stiffness_title">Жесткость пружины (Stiffness)</string>
+    <string name="damping_title">Затухание (Damping Ratio)</string>
+    <string name="duration_title">Базовая длительность перехода (мс)</string>
+    <string name="corner_radius_title">Морфинг скругления углов</string>
+    <string name="landing_bounce_title">Отскок иконки при приземлении</string>
+    <string name="wallpaper_zoom_title">Глубина обоев (Wallpaper Depth Zoom)</string>
+    <string name="restart_launcher_button">Перезапустить Trebuchet</string>
+    <string name="restart_systemui_button">Перезапустить SystemUI</string>
+</resources>
