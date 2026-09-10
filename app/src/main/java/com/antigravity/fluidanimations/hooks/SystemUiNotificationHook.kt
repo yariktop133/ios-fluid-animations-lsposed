@@ -77,6 +77,25 @@ object SystemUiNotificationHook {
                 Log.w(TAG, "Notification TransitionAnimator.Interpolators hook warning: ${t.message}")
             }
         }
+
+        // Обновление статических синглтонов TIMINGS и INTERPOLATORS (если уже инициализированы)
+        val ataClass = findClassSafe("com.android.systemui.animation.ActivityTransitionAnimator", classLoader)
+        if (ataClass != null) {
+            try {
+                val staticTimings = XposedHelpers.getStaticObjectField(ataClass, "TIMINGS")
+                if (staticTimings != null) {
+                    XposedHelpers.setLongField(staticTimings, "totalDuration", ConfigManager.config.openDurationMs)
+                }
+                val staticInterpolators = XposedHelpers.getStaticObjectField(ataClass, "INTERPOLATORS")
+                if (staticInterpolators != null) {
+                    XposedHelpers.setObjectField(staticInterpolators, "positionInterpolator", FluidCurves.HYPEROS_OPEN)
+                    XposedHelpers.setObjectField(staticInterpolators, "positionXInterpolator", FluidCurves.HYPEROS_OPEN_X)
+                }
+                Log.i(TAG, "ActivityTransitionAnimator static TIMINGS and INTERPOLATORS updated")
+            } catch (t: Throwable) {
+                // Ignore if static fields are not present
+            }
+        }
     }
 
     private fun findClassSafe(className: String, classLoader: ClassLoader): Class<*>? {

@@ -45,6 +45,10 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -65,4 +69,7 @@ dependencies {
 
     // JSON serialization for configuration
     implementation("org.json:json:20240303")
+
+    // Unit testing
+    testImplementation("junit:junit:4.13.2")
 }

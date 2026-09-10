@@ -112,7 +112,11 @@ class MainActivity : ComponentActivity() {
                 }
                 val exitCode = process.waitFor()
                 runOnUiThread {
-                    Toast.makeText(this, "Перезапущено: $pkg", Toast.LENGTH_SHORT).show()
+                    if (exitCode == 0) {
+                        Toast.makeText(this, "Перезапущено: $pkg", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Ошибка Root (код: $exitCode): проверьте права в Magisk / KernelSU / APatch", Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread {

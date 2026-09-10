@@ -96,8 +96,12 @@ object WMShellTransitionHook {
             XposedBridge.hookAllMethods(sduClass, "getWindowCornerRadius", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (!ConfigManager.config.cornerRadiusMorph) return
-                    val context = param.args.firstOrNull() as? Context
-                    val density = context?.resources?.displayMetrics?.density ?: 2.75f
+                    val resources = when (val first = param.args.firstOrNull()) {
+                        is Context -> first.resources
+                        is android.content.res.Resources -> first
+                        else -> null
+                    }
+                    val density = resources?.displayMetrics?.density ?: 2.75f
                     param.result = ConfigManager.config.displayCornerRadiusDp * density
                 }
             })
@@ -116,7 +120,8 @@ object WMShellTransitionHook {
 
         when (obj) {
             is AnimationSet -> {
-                val origParentDuration = obj.duration.takeIf { it > 0 } ?: duration
+                val maxChildDuration = obj.animations.maxOfOrNull { it.startOffset + it.duration }?.takeIf { it > 0 }
+                val origParentDuration = obj.duration.takeIf { it > 0 } ?: maxChildDuration ?: duration
                 val scaleFactor = duration.toFloat() / origParentDuration.toFloat()
                 obj.duration = duration
                 obj.interpolator = curve

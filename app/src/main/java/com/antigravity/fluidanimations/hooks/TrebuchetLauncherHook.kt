@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.Resources
 import android.util.Log
 import android.view.View
 import android.view.animation.LinearInterpolator
@@ -17,6 +18,8 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
  * Хук-контроллер для лаунчера Trebuchet (основанного на AOSP Launcher3 + Quickstep).
@@ -27,6 +30,9 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 object TrebuchetLauncherHook {
     private const val TAG = "FluidAnim_Trebuchet"
 
+    private val hookedProviderClasses = mutableSetOf<Class<*>>()
+    private val activeBounceAnimators = Collections.synchronizedMap(WeakHashMap<View, Pair<SpringAnimation, SpringAnimation>>())
+
     fun hook(lpparam: XC_LoadPackage.LoadPackageParam) {
         val classLoader = lpparam.classLoader
 
@@ -34,6 +40,7 @@ object TrebuchetLauncherHook {
         hookQuickStepContract(classLoader)
         hookAbsSwipeUpHandler(classLoader)
         hookRectFSpringAnim(classLoader)
+        hookDynamicResource(classLoader)
     }
 
     /**
@@ -77,9 +84,33 @@ object TrebuchetLauncherHook {
             Log.w(TAG, "Failed to hook getOpeningWindowAnimators: ${t.message}")
         }
 
+        // Перехват открытия приложений из виджетов: getOpeningWindowAnimatorsForWidget
+        try {
+            XposedBridge.hookAllMethods(qtmClass, "getOpeningWindowAnimatorsForWidget", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    setOpeningInterpolators(param.thisObject)
+                }
+
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val result = param.result ?: return
+                    applyOpenWindowDuration(result, ConfigManager.config.openDurationMs)
+                }
+            })
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to hook getOpeningWindowAnimatorsForWidget: ${t.message}")
+        }
+
         // Синхронизация времени скрытия содержимого лаунчера с длительностью открытия окна
         try {
             XposedBridge.hookAllMethods(qtmClass, "composeIconLaunchAnimator", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    // Отменяем отскок, если иконка была нажата во время посадки
+                    val launcherView = param.args.getOrNull(1) as? View
+                    if (launcherView != null) {
+                        cancelLandingBounce(launcherView)
+                    }
+                }
+
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val anim = param.args.firstOrNull() as? AnimatorSet ?: return
                     synchronizeLauncherContentAnimator(anim, ConfigManager.config.openDurationMs)
@@ -94,16 +125,14 @@ object TrebuchetLauncherHook {
             XposedBridge.hookAllMethods(qtmClass, "getLauncherContentAnimator", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val isAppOpening = param.args.firstOrNull() as? Boolean ?: true
-                    if (isAppOpening) {
-                        val pair = param.result ?: return
-                        try {
-                            val launcherAnimator = XposedHelpers.getObjectField(pair, "first") as? AnimatorSet
-                            val duration = ConfigManager.config.openDurationMs
-                            launcherAnimator?.duration = duration
-                            launcherAnimator?.childAnimations?.forEach { it.duration = duration }
-                        } catch (t: Throwable) {
-                            // Non-fatal
-                        }
+                    val pair = param.result ?: return
+                    try {
+                        val launcherAnimator = XposedHelpers.getObjectField(pair, "first") as? AnimatorSet
+                        val duration = if (isAppOpening) ConfigManager.config.openDurationMs else ConfigManager.config.closeDurationMs
+                        launcherAnimator?.duration = duration
+                        launcherAnimator?.childAnimations?.forEach { it.duration = duration }
+                    } catch (t: Throwable) {
+                        // Non-fatal
                     }
                 }
             })
@@ -187,11 +216,23 @@ object TrebuchetLauncherHook {
                         else -> listOf(result)
                     }
 
+                    // Извлекаем иконку из HomeAnimationFactory (arg 1), если доступна
+                    val homeAnimFactory = param.args.getOrNull(1)
+                    val factoryIconView = homeAnimFactory?.let {
+                        runCatching {
+                            XposedHelpers.callMethod(it, "getIconView") as? View
+                        }.getOrNull()
+                    }
+
                     for (anim in animList) {
                         if (anim == null) continue
                         applySpringPhysicsToRectFAnim(anim)
                         if (ConfigManager.config.landingBounce) {
-                            attachLandingBounceFromSpringAnim(anim)
+                            if (factoryIconView != null) {
+                                attachLandingBounce(anim, factoryIconView)
+                            } else {
+                                attachLandingBounceFromSpringAnim(anim)
+                            }
                         }
                     }
                 }
@@ -291,7 +332,54 @@ object TrebuchetLauncherHook {
     }
 
     /**
+     * Хук DynamicResource: обеспечивает автоматическую подстановку жесткости (340f) и демпфирования (0.84f)
+     * для любых динамических ресурсов пружин Trebuchet / Launcher3.
+     */
+    private fun hookDynamicResource(classLoader: ClassLoader) {
+        val dynResClass = findClassSafe("com.android.launcher3.util.DynamicResource", classLoader)
+            ?: return
+
+        try {
+            XposedBridge.hookAllMethods(dynResClass, "provider", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val provider = param.result ?: return
+                    hookResourceProvider(provider.javaClass, param.args.firstOrNull() as? Context)
+                }
+            })
+            Log.i(TAG, "DynamicResource.provider hooked successfully")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to hook DynamicResource.provider: ${t.message}")
+        }
+    }
+
+    private fun hookResourceProvider(providerClass: Class<*>, context: Context?) {
+        if (!hookedProviderClasses.add(providerClass)) return
+        try {
+            XposedBridge.hookAllMethods(providerClass, "getFloat", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val resId = param.args.firstOrNull() as? Int ?: return
+                    try {
+                        val ctx = context ?: return
+                        val entryName = ctx.resources.getResourceEntryName(resId)
+                        if (entryName.contains("stiffness", ignoreCase = true)) {
+                            param.result = ConfigManager.config.stiffness
+                        } else if (entryName.contains("damping", ignoreCase = true)) {
+                            param.result = ConfigManager.config.dampingRatio
+                        }
+                    } catch (t: Throwable) {
+                        // Non-fatal
+                    }
+                }
+            })
+            Log.i(TAG, "ResourceProvider.getFloat hooked on ${providerClass.name}")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to hook ResourceProvider: ${t.message}")
+        }
+    }
+
+    /**
      * Точный радиус скругления дисплея Poco X6 Pro (~38dp / ~105px).
+     * Поддерживает как вызовы с Context, так и с Resources.
      */
     private fun hookQuickStepContract(classLoader: ClassLoader) {
         val quickStepContractClass = findClassSafe("com.android.systemui.shared.system.QuickStepContract", classLoader)
@@ -301,8 +389,12 @@ object TrebuchetLauncherHook {
             XposedBridge.hookAllMethods(quickStepContractClass, "getWindowCornerRadius", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (!ConfigManager.config.cornerRadiusMorph) return
-                    val context = param.args.firstOrNull() as? Context
-                    val density = context?.resources?.displayMetrics?.density ?: 2.75f
+                    val resources = when (val first = param.args.firstOrNull()) {
+                        is Context -> first.resources
+                        is Resources -> first
+                        else -> null
+                    }
+                    val density = resources?.displayMetrics?.density ?: 2.75f
                     param.result = ConfigManager.config.displayCornerRadiusDp * density
                 }
             })
@@ -364,6 +456,8 @@ object TrebuchetLauncherHook {
                     for (subChild in child.childAnimations) {
                         subChild.duration = duration
                     }
+                } else if (child is Animator) {
+                    child.duration = duration
                 }
             }
         } catch (t: Throwable) {
@@ -408,16 +502,27 @@ object TrebuchetLauncherHook {
     }
 
     /**
-     * Присоединение слушателя Landing Bounce к RectFSpringAnim с извлечением mOriginalIcon из FloatingIconView.
+     * Присоединение слушателя Landing Bounce к RectFSpringAnim.
+     * Захватывает ссылку на mOriginalIcon СРАЗУ, до того как FloatingIconView.recycle() обнулит mOriginalIcon!
      */
     private fun attachLandingBounceFromSpringAnim(anim: Any) {
         try {
+            val initialListeners = runCatching {
+                XposedHelpers.getObjectField(anim, "mAnimatorListeners") as? List<*>
+            }.getOrNull()
+            val initialFiv = initialListeners?.firstOrNull { it?.javaClass?.name?.contains("FloatingIconView") == true }
+            val capturedIcon = initialFiv?.let {
+                runCatching { XposedHelpers.getObjectField(it, "mOriginalIcon") as? View }.getOrNull()
+            }
+
             val listener = object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     try {
-                        val listeners = XposedHelpers.getObjectField(anim, "mAnimatorListeners") as? List<*>
-                        val fiv = listeners?.firstOrNull { it?.javaClass?.name?.contains("FloatingIconView") == true }
-                        val icon = fiv?.let { XposedHelpers.getObjectField(it, "mOriginalIcon") as? View }
+                        val icon = capturedIcon ?: run {
+                            val listeners = XposedHelpers.getObjectField(anim, "mAnimatorListeners") as? List<*>
+                            val fiv = listeners?.firstOrNull { it?.javaClass?.name?.contains("FloatingIconView") == true }
+                            fiv?.let { XposedHelpers.getObjectField(it, "mOriginalIcon") as? View }
+                        }
                         if (icon != null) {
                             runLandingBounce(icon)
                         }
@@ -433,13 +538,34 @@ object TrebuchetLauncherHook {
     }
 
     /**
+     * Отмена текущего отскока для предотвращения конфликтов при быстром прерывании жестов.
+     */
+    fun cancelLandingBounce(iconView: View) {
+        activeBounceAnimators.remove(iconView)?.let { (animX, animY) ->
+            try {
+                animX.cancel()
+                animY.cancel()
+                iconView.setLayerType(View.LAYER_TYPE_NONE, null)
+                iconView.scaleX = 1.0f
+                iconView.scaleY = 1.0f
+            } catch (ignored: Throwable) {
+            }
+        }
+    }
+
+    /**
      * Аппаратный (Hardware-Layer) отскок иконки (Landing Bounce) через нативный SpringAnimation.
      * Без postDelayed: срабатывает строго по завершении анимации возврата на рабочий стол.
      */
     private fun runLandingBounce(iconView: View) {
         iconView.post {
+            if (!iconView.isAttachedToWindow) return@post
             try {
+                cancelLandingBounce(iconView)
+
                 iconView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                iconView.pivotX = iconView.width / 2f
+                iconView.pivotY = iconView.height / 2f
                 iconView.scaleX = 0.91f
                 iconView.scaleY = 0.91f
 
@@ -456,16 +582,23 @@ object TrebuchetLauncherHook {
                 val animY = SpringAnimation(iconView, DynamicAnimation.SCALE_Y).apply {
                     spring = springForce
                     setStartValue(0.91f)
-                    addEndListener { _, _, _, _ ->
+                    addEndListener { _, canceled, _, _ ->
+                        activeBounceAnimators.remove(iconView)
                         iconView.setLayerType(View.LAYER_TYPE_NONE, null)
+                        if (!canceled) {
+                            iconView.scaleX = 1.0f
+                            iconView.scaleY = 1.0f
+                        }
                     }
                 }
 
+                activeBounceAnimators[iconView] = Pair(animX, animY)
                 animX.start()
                 animY.start()
             } catch (t: Throwable) {
                 Log.w(TAG, "Landing bounce spring animation error: ${t.message}")
                 try {
+                    activeBounceAnimators.remove(iconView)
                     iconView.setLayerType(View.LAYER_TYPE_NONE, null)
                     iconView.scaleX = 1.0f
                     iconView.scaleY = 1.0f
