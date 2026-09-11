@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     onConfigChanged = { newConfig ->
                         ConfigManager.saveConfig(this, newConfig)
                     },
-                    onRestartTrebuchet = { restartPackage("org.lineageos.trebuchet") },
+                    onRestartTrebuchet = { restartPackage("com.android.launcher3") },
                     onRestartSystemUi = { restartPackage("com.android.systemui") }
                 )
             }
@@ -103,18 +103,18 @@ class MainActivity : ComponentActivity() {
     private fun restartPackage(pkg: String) {
         Thread {
             try {
-                val process = Runtime.getRuntime().exec("su")
-                java.io.DataOutputStream(process.outputStream).use { os ->
-                    os.writeBytes("am force-stop $pkg\n")
-                    os.writeBytes("exit 0\n")
-                    os.flush()
+                val cmd = if (pkg.contains("launcher")) {
+                    "am force-stop com.android.launcher3; killall com.android.launcher3; am force-stop org.lineageos.trebuchet\n"
+                } else {
+                    "am force-stop $pkg; killall $pkg\n"
                 }
+                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
                 val exitCode = process.waitFor()
                 runOnUiThread {
                     if (exitCode == 0) {
                         Toast.makeText(this, "Перезапущено: $pkg", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(this, "Ошибка Root (код: $exitCode): проверьте права в Magisk / KernelSU / APatch", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Команда отправлена ($pkg)", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {

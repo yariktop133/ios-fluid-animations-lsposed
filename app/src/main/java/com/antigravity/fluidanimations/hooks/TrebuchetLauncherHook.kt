@@ -38,6 +38,7 @@ object TrebuchetLauncherHook {
         hookQuickstepTransitionManager(classLoader)
         hookQuickStepContract(classLoader)
         hookAbsSwipeUpHandler(classLoader)
+        hookRectFSpringAnim(classLoader)
     }
 
     /**
@@ -114,6 +115,25 @@ object TrebuchetLauncherHook {
             })
         } catch (t: Throwable) {
             Log.w(TAG, "Failed to hook getClosingWindowAnimators: ${t.message}")
+        }
+
+        // Согласованное масштабирование рабочего стола при открытии приложения
+        try {
+            XposedBridge.hookAllMethods(qtmClass, "getLauncherContentAnimator", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val isAppOpening = param.args.getOrNull(0) as? Boolean ?: return
+                    if (!isAppOpening) return
+                    val pair = param.result as? android.util.Pair<*, *> ?: return
+                    val animSet = pair.first as? android.animation.AnimatorSet ?: return
+                    for (child in animSet.childAnimations) {
+                        if (child is android.animation.ObjectAnimator) {
+                            child.interpolator = FluidCurves.IOS_OPEN_CONTENT
+                        }
+                    }
+                }
+            })
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to hook getLauncherContentAnimator: ${t.message}")
         }
     }
 
@@ -261,6 +281,49 @@ object TrebuchetLauncherHook {
                 iconView.scaleX = 1.0f
                 iconView.scaleY = 1.0f
             }
+        }
+    }
+
+    /**
+     * Прямая инжекция физики iOS / HyperOS 3 в пружины RectFSpringAnim для возврата на рабочий стол.
+     */
+    private fun hookRectFSpringAnim(classLoader: ClassLoader) {
+        val rfsaClass = findClassSafe("com.android.quickstep.util.RectFSpringAnim", classLoader)
+            ?: return
+
+        try {
+            XposedBridge.hookAllMethods(rfsaClass, "start", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val config = ConfigManager.config
+                    runCatching {
+                        XposedHelpers.setFloatField(param.thisObject, "mStiffnessX", config.stiffness)
+                        XposedHelpers.setFloatField(param.thisObject, "mStiffnessY", config.stiffness)
+                        XposedHelpers.setFloatField(param.thisObject, "mDampingX", config.dampingRatio)
+                        XposedHelpers.setFloatField(param.thisObject, "mDampingY", config.dampingRatio)
+                        XposedHelpers.setFloatField(param.thisObject, "mRectStiffness", config.stiffness)
+                    }
+                }
+
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val config = ConfigManager.config
+                    val springX = runCatching { XposedHelpers.getObjectField(param.thisObject, "mRectXSpring") }.getOrNull()
+                    val springY = runCatching { XposedHelpers.getObjectField(param.thisObject, "mRectYSpring") }.getOrNull()
+                    val springScale = runCatching { XposedHelpers.getObjectField(param.thisObject, "mRectScaleAnim") }.getOrNull()
+
+                    for (s in listOfNotNull(springX, springY, springScale)) {
+                        runCatching {
+                            val force = XposedHelpers.callMethod(s, "getSpring")
+                            if (force != null) {
+                                XposedHelpers.callMethod(force, "setStiffness", config.stiffness)
+                                XposedHelpers.callMethod(force, "setDampingRatio", config.dampingRatio)
+                            }
+                        }
+                    }
+                }
+            })
+            Log.i(TAG, "RectFSpringAnim.start hooked with custom physics")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to hook RectFSpringAnim: ${t.message}")
         }
     }
 

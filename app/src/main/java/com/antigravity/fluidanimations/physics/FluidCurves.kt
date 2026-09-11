@@ -30,15 +30,27 @@ object FluidCurves {
     val IOS_LANDING_BOUNCE: Interpolator = PathInterpolator(0.175f, 0.885f, 0.32f, 1.15f)
 
     /**
-     * Выделенная кривая HyperOS 3 / iOS Fluid Quintic для вертикальной оси (Y), масштабирования и скругления при открытии.
-     * Quintic Bezier (0.20, 0.0, 0.0, 1.0)
+     * Эталонная кривая iOS / HyperOS 3 Fluid Ease-Out для открытия приложений.
+     * Мгновенный отклик на касание (v0 > 0) и бархатное монотонное затухание.
+     * Cubic Bezier (0.15, 0.85, 0.25, 1.0)
      */
-    val HYPEROS_OPEN: Interpolator = PathInterpolator(0.20f, 0.0f, 0.0f, 1.0f)
+    val IOS_OPEN: Interpolator = PathInterpolator(0.15f, 0.85f, 0.25f, 1.0f)
+
+    /**
+     * Координированная кривая для анимации масштабирования рабочего стола и затемнения.
+     * Cubic Bezier (0.20, 0.90, 0.30, 1.0)
+     */
+    val IOS_OPEN_CONTENT: Interpolator = PathInterpolator(0.20f, 0.90f, 0.30f, 1.0f)
+
+    /**
+     * Выделенная кривая HyperOS 3 / iOS Fluid Quintic для вертикальной оси (Y), масштабирования и скругления при открытии.
+     */
+    val HYPEROS_OPEN: Interpolator = IOS_OPEN
 
     /**
      * Выделенная кривая HyperOS 3 / iOS Fluid Quintic для горизонтальной оси (X) при открытии.
-     * Quintic Bezier (0.22, 0.0, 0.10, 1.0)
+     * Синхронизирована с вертикальной осью для предотвращения асимметричных перекосов окна.
      */
-    val HYPEROS_OPEN_X: Interpolator = PathInterpolator(0.22f, 0.0f, 0.10f, 1.0f)
+    val HYPEROS_OPEN_X: Interpolator = IOS_OPEN
 }
 
